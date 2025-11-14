@@ -1,22 +1,52 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require("dotenv").config();
+const dotenv = require("dotenv");
+const helmet = require("helmet");
+const mongoSanitize = require("express-mongo-sanitize");
+const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 
-const app = express();
+// Load environment variables
+dotenv.config();
+
+const app = express();   // ✅ THIS MUST COME FIRST
+
+// ---------- Security Middlewares ----------
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(cookieParser());
+
+// Rate limiter (protects login + register)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+});
+app.use(limiter);
+
+// ---------- Body Parsing ----------
 app.use(express.json());
-app.use(cors());
 
+// ---------- CORS ----------
+app.use(
+  cors({
+    origin: "*",        // You can change this to your frontend URL for more security
+    credentials: true,
+  })
+);
+
+// ---------- Routes ----------
 const userRoutes = require("./routes/userRoutes");
-
 app.use("/api/users", userRoutes);
 
-const PORT = process.env.PORT || 5000;
-
+// ---------- MongoDB Connection ----------
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB connected successfully");
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-  })
-  .catch((err) => console.log("❌ MongoDB connection error:", err));
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
+
+// ---------- Start Server ----------
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
